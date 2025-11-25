@@ -1,15 +1,19 @@
 import Yarn from "../models/yarn.js";
 import { NotFoundError, ConflictError } from "../middleware/errors.js";
+import { buildQuery } from "../utils/queryBuilder.js";
 
 class YarnService {
-    async getAll() {
-        const query = {};
+    async getAll(filters = {}) {
+        const query = buildQuery(filters);
         const yarns = await Yarn.find(query).sort({ updatedAt: -1 });
         return yarns;
     }
 
     async getById(id) {
-        const yarn = await Yarn.findById(id);
+        const yarn = await Yarn.findById(id).populate({
+            path: "usedInProjects",
+            select: "name projectType status startDate completionDate",
+        });
 
         if (!yarn) {
             throw new NotFoundError("Yarn");
@@ -47,7 +51,7 @@ class YarnService {
         const yarn = await Yarn.findById(id);
 
         if (!yarn) {
-            throw new NotFoundError("Project");
+            throw new NotFoundError("Yarn");
         }
 
         yarn.photos.push(photoData);

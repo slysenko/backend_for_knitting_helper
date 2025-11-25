@@ -71,12 +71,12 @@ class YarnController {
 
     async addYarnPhoto(req, res, next) {
         try {
-            const project = await YarnService.addPhoto(req.params.id, req.body);
+            const yarn = await YarnService.addPhoto(req.params.id, req.body);
 
             res.status(201).json({
                 success: true,
                 message: "Photo added successfully",
-                data: project,
+                data: yarn,
             });
         } catch (error) {
             next(error);

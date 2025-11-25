@@ -1,15 +1,12 @@
 import Project from "../models/project.js";
-import { NotFoundError, ConflictError } from "../middleware/errors.js";
+import { NotFoundError, ValidationError, ConflictError } from "../middleware/errors.js";
+import { buildQuery } from "../utils/queryBuilder.js";
 
 class ProjectService {
     async getAll(filters = {}) {
-        const query = {};
-
-        if (filters.status) query.status = filters.status;
-        if (filters.projectType) query.projectType = filters.projectType;
+        const query = buildQuery(filters);
 
         const projects = await Project.find(query)
-            .populate("primaryYarn")
             .populate("yarnsUsed.yarn")
             .sort({ updatedAt: -1 });
 
@@ -17,7 +14,7 @@ class ProjectService {
     }
 
     async getById(id) {
-        const project = await Project.findById(id).populate("primaryYarn").populate("yarnsUsed.yarn");
+        const project = await Project.findById(id).populate("yarnsUsed.yarn");
 
         if (!project) {
             throw new NotFoundError("Project");
@@ -27,18 +24,32 @@ class ProjectService {
     }
 
     async create(data) {
+        if (data.yarnsUsed && data.yarnsUsed.length > 0) {
+            const yarnIds = data.yarnsUsed.map((y) => y.yarn.toString());
+            const uniqueYarnIds = [...new Set(yarnIds)];
+
+            if (yarnIds.length !== uniqueYarnIds.length) {
+                throw new ValidationError("Cannot add the same yarn multiple times to a project");
+            }
+
+            const primaryYarns = data.yarnsUsed.filter((y) => y.isPrimary);
+            if (primaryYarns.length > 1) {
+                throw new ValidationError("Only one yarn can be marked as primary");
+            }
+        }
+
         const project = new Project(data);
         await project.save();
 
-        await project.populate("primaryYarn");
+        await project.populate("yarnsUsed.yarn");
 
         return project;
     }
 
     async update(id, updateData) {
-        const project = await Project.findByIdAndUpdate(id, updateData, { new: true, runValidators: true })
-            .populate("primaryYarn")
-            .populate("yarnsUsed.yarn");
+        const project = await Project.findByIdAndUpdate(id, updateData, { new: true, runValidators: true }).populate(
+            "yarnsUsed.yarn",
+        );
 
         if (!project) {
             throw new NotFoundError("Project");
@@ -65,7 +76,7 @@ class ProjectService {
         }
 
         const project = await Project.findByIdAndUpdate(id, updateData, { new: true, runValidators: true }).populate(
-            "primaryYarn",
+            "yarnsUsed.yarn",
         );
 
         if (!project) {
@@ -99,6 +110,12 @@ class ProjectService {
 
         if (existingYarn) {
             throw new ConflictError("Yarn already added to this project");
+        }
+
+        if (yarnData.isPrimary) {
+            project.yarnsUsed.forEach((y) => {
+                y.isPrimary = false;
+            });
         }
 
         project.yarnsUsed.push(yarnData);

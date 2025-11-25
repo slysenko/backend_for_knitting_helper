@@ -10,10 +10,6 @@ const projectSchema = new Schema(
             required: true,
             enum: ["knitting", "crochet"],
         },
-        primaryYarn: {
-            type: Schema.Types.ObjectId,
-            ref: "Yarn",
-        },
         status: {
             type: String,
             default: "active",
@@ -43,6 +39,7 @@ const projectSchema = new Schema(
                     ref: "Yarn",
                     required: true,
                 },
+                isPrimary: { type: Boolean, default: false },
                 quantityUsed: { type: Number, required: true },
                 quantityUnit: {
                     type: String,
@@ -93,6 +90,10 @@ projectSchema.virtual("totalAdditionalCost").get(function () {
 
 projectSchema.virtual("totalProjectCost").get(function () {
     return this.totalYarnCost + this.totalAdditionalCost;
+});
+
+projectSchema.virtual("primaryYarn").get(function () {
+    return this.yarnsUsed.find((y) => y.isPrimary);
 });
 
 projectSchema.set("toJSON", { virtuals: true });

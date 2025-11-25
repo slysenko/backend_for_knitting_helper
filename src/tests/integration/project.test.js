@@ -58,24 +58,35 @@ describe("POST /api/projects - Create Project", () => {
                 expect(response.body.data.projectType).toBe("crochet");
             });
 
-            it("should create a project with primaryYarn reference", async () => {
+            it("should create a project with yarnsUsed", async () => {
                 const yarn = new Yarn({
                     brand: "Malabrigo",
                     name: "Rios",
-                    weight: "worsted",
                 });
                 await yarn.save();
 
                 const projectData = {
                     name: "Cozy Hat",
                     projectType: "knitting",
-                    primaryYarn: yarn._id.toString(),
+                    yarnsUsed: [
+                        {
+                            yarn: yarn._id.toString(),
+                            isPrimary: true,
+                            quantityUsed: 2,
+                            quantityUnit: "skeins",
+                            costPerUnit: 12.99,
+                        },
+                    ],
                 };
 
                 const response = await request(app).post("/api/projects").send(projectData).expect(201);
 
+                expect(response.body.data.yarnsUsed).toHaveLength(1);
+                expect(response.body.data.yarnsUsed[0].yarn._id).toBe(yarn._id.toString());
+                expect(response.body.data.yarnsUsed[0].isPrimary).toBe(true);
+                expect(response.body.data.yarnsUsed[0].quantityUsed).toBe(2);
                 expect(response.body.data.primaryYarn).toBeDefined();
-                expect(response.body.data.primaryYarn._id || response.body.data.primaryYarn).toBe(yarn._id.toString());
+                expect(response.body.data.primaryYarn.yarn._id).toBe(yarn._id.toString());
             });
 
             it("should trim whitespace from project name", async () => {
@@ -103,6 +114,55 @@ describe("POST /api/projects - Create Project", () => {
 
                     expect(response.body.data.status).toBe(status);
                 }
+            });
+
+            it("should create a project with multiple yarnsUsed", async () => {
+                const yarn1 = await Yarn.create({ name: "Yarn 1", brand: "Brand A" });
+                const yarn2 = await Yarn.create({ name: "Yarn 2", brand: "Brand B" });
+
+                const projectData = {
+                    name: "Multi-Yarn Project",
+                    projectType: "knitting",
+                    yarnsUsed: [
+                        {
+                            yarn: yarn1._id.toString(),
+                            isPrimary: true,
+                            quantityUsed: 2,
+                            quantityUnit: "skeins",
+                            costPerUnit: 12.99,
+                            currency: "USD",
+                        },
+                        {
+                            yarn: yarn2._id.toString(),
+                            quantityUsed: 1,
+                            quantityUnit: "balls",
+                            costPerUnit: 8.5,
+                            currency: "EUR",
+                        },
+                    ],
+                };
+
+                const response = await request(app).post("/api/projects").send(projectData).expect(201);
+
+                expect(response.body.success).toBe(true);
+                expect(response.body.data.yarnsUsed).toHaveLength(2);
+                expect(response.body.data.yarnsUsed[0].yarn.name).toBe("Yarn 1");
+                expect(response.body.data.yarnsUsed[0].quantityUsed).toBe(2);
+                expect(response.body.data.yarnsUsed[0].isPrimary).toBe(true);
+                expect(response.body.data.yarnsUsed[1].yarn.name).toBe("Yarn 2");
+                expect(response.body.data.yarnsUsed[1].isPrimary).toBe(false);
+            });
+
+            it("should create a project without yarnsUsed (empty array)", async () => {
+                const projectData = {
+                    name: "No Yarn Project",
+                    projectType: "knitting",
+                };
+
+                const response = await request(app).post("/api/projects").send(projectData).expect(201);
+
+                expect(response.body.success).toBe(true);
+                expect(response.body.data.yarnsUsed).toEqual([]);
             });
         });
 
@@ -187,7 +247,7 @@ describe("POST /api/projects - Create Project", () => {
         });
     });
 
-    describe("Validation Failuresponse", () => {
+    describe("Validation Failure response", () => {
         describe("POST cases", () => {
             it("should fail when name is missing", async () => {
                 const projectData = {
@@ -267,16 +327,58 @@ describe("POST /api/projects - Create Project", () => {
                 expect(responseponse.body.success).toBe(false);
             });
 
-            it("should fail when primaryYarn has invalid ObjectId format", async () => {
+            it("should fail when yarnsUsed contains invalid yarn ID", async () => {
                 const projectData = {
                     name: "My Project",
                     projectType: "knitting",
-                    primaryYarn: "invalid-id-format",
+                    yarnsUsed: [
+                        {
+                            yarn: "invalid-id-format",
+                            quantityUsed: 2,
+                        },
+                    ],
                 };
 
                 const response = await request(app).post("/api/projects").send(projectData).expect(400);
 
                 expect(response.body.success).toBe(false);
+            });
+
+            it("should fail when yarnsUsed contains duplicate yarn IDs", async () => {
+                const yarn = await Yarn.create({ name: "Test Yarn" });
+
+                const projectData = {
+                    name: "Duplicate Yarn Project",
+                    projectType: "knitting",
+                    yarnsUsed: [
+                        { yarn: yarn._id.toString(), quantityUsed: 2 },
+                        { yarn: yarn._id.toString(), quantityUsed: 3 },
+                    ],
+                };
+
+                const response = await request(app).post("/api/projects").send(projectData).expect(400);
+
+                expect(response.body.success).toBe(false);
+                expect(response.body.message).toContain("Cannot add the same yarn multiple times");
+            });
+
+            it("should fail when multiple yarns are marked as primary", async () => {
+                const yarn1 = await Yarn.create({ name: "Yarn 1" });
+                const yarn2 = await Yarn.create({ name: "Yarn 2" });
+
+                const projectData = {
+                    name: "Multiple Primary Yarns Project",
+                    projectType: "knitting",
+                    yarnsUsed: [
+                        { yarn: yarn1._id.toString(), quantityUsed: 2, isPrimary: true },
+                        { yarn: yarn2._id.toString(), quantityUsed: 3, isPrimary: true },
+                    ],
+                };
+
+                const response = await request(app).post("/api/projects").send(projectData).expect(400);
+
+                expect(response.body.success).toBe(false);
+                expect(response.body.message).toContain("Only one yarn can be marked as primary");
             });
 
             it("should fail when comments exceed 2000 characters", async () => {

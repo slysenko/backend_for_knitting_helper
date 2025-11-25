@@ -5,12 +5,22 @@ const yarnSchema = new Schema(
     {
         name: { type: String, required: true },
         brand: String,
-        weight: String, // "Worsted", "DK", "Fingering", etc.
+        yarnType: String, // "Worsted", "DK", "Fingering", etc.
         fiberContent: String,
         color: String,
         lotNumber: String,
-        lengthMeters: Number,
-        weightGrams: Number,
+        length: Number,
+        lengthUnit: {
+            type: String,
+            enum: ["meters", "yards", "feet"],
+            default: "meters",
+        },
+        weight: Number,
+        weightUnit: {
+            type: String,
+            enum: ["grams", "ounces", "pounds"],
+            default: "grams",
+        },
         pricePerUnit: Number,
         currency: { type: String, default: "EUR" },
         purchaseDate: Date,
@@ -47,8 +57,18 @@ const yarnSchema = new Schema(
 );
 
 yarnSchema.index({ brand: 1, name: 1 });
-yarnSchema.index({ weight: 1 });
+yarnSchema.index({ yarnType: 1 });
 yarnSchema.index({ quantityInStash: 1 });
+
+// Virtual field to show which projects use this yarn
+yarnSchema.virtual("usedInProjects", {
+    ref: "Project",
+    localField: "_id",
+    foreignField: "yarnsUsed.yarn",
+});
+
+yarnSchema.set("toJSON", { virtuals: true });
+yarnSchema.set("toObject", { virtuals: true });
 
 const Yarn = model("Yarn", yarnSchema);
 

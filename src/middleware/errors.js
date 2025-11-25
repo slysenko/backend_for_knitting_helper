@@ -20,9 +20,9 @@ class ValidationError extends AppError {
     }
 }
 
-class ConflictError extends Error {
-     constructor(message) {
-        super(message);
+class ConflictError extends AppError {
+    constructor(message) {
+        super(message, 409);
         this.name = "ConflictError";
     }
 }

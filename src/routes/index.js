@@ -1,6 +1,6 @@
 import { Router } from "express";
 import projectRoutes from "./project_routes.js";
-import yarnRoutes from "./yarn_routes";
+import yarnRoutes from "./yarn_routes.js";
 // import needleRoutes from "./needle.routes";
 // import hookRoutes from "./hook.routes";
 // import gaugeRoutes from "./gauge.routes";
