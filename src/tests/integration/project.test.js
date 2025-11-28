@@ -3,6 +3,8 @@ import mongoose from "mongoose";
 import app from "../../app.js";
 import Project from "../../models/project.js";
 import Yarn from "../../models/yarn.js";
+import Needle from "../../models/needle.js";
+import Hook from "../../models/hook.js";
 
 describe("POST /api/projects - Create Project", () => {
     describe("Success Cases", () => {
@@ -163,6 +165,183 @@ describe("POST /api/projects - Create Project", () => {
 
                 expect(response.body.success).toBe(true);
                 expect(response.body.data.yarnsUsed).toEqual([]);
+            });
+
+            it("should create a project with needlesUsed", async () => {
+                const needle = await Needle.create({
+                    sizeMm: 4.0,
+                    sizeUs: "6",
+                    type: "circular",
+                    material: "bamboo",
+                    brand: "ChiaoGoo",
+                });
+
+                const projectData = {
+                    name: "Sweater Project",
+                    projectType: "knitting",
+                    needlesUsed: [
+                        {
+                            needle: needle._id.toString(),
+                            isPrimary: true,
+                            notes: "Used for the body",
+                        },
+                    ],
+                };
+
+                const response = await request(app).post("/api/projects").send(projectData).expect(201);
+
+                expect(response.body.success).toBe(true);
+                expect(response.body.data.needlesUsed).toHaveLength(1);
+                expect(response.body.data.needlesUsed[0].needle._id).toBe(needle._id.toString());
+                expect(response.body.data.needlesUsed[0].isPrimary).toBe(true);
+                expect(response.body.data.needlesUsed[0].notes).toBe("Used for the body");
+            });
+
+            it("should create a project with multiple needlesUsed", async () => {
+                const needle1 = await Needle.create({ sizeMm: 4.0, type: "circular" });
+                const needle2 = await Needle.create({ sizeMm: 3.5, type: "dpn" });
+
+                const projectData = {
+                    name: "Multi-Needle Project",
+                    projectType: "knitting",
+                    needlesUsed: [
+                        {
+                            needle: needle1._id.toString(),
+                            isPrimary: true,
+                            notes: "Main body",
+                        },
+                        {
+                            needle: needle2._id.toString(),
+                            isPrimary: false,
+                            notes: "Sleeves",
+                        },
+                    ],
+                };
+
+                const response = await request(app).post("/api/projects").send(projectData).expect(201);
+
+                expect(response.body.success).toBe(true);
+                expect(response.body.data.needlesUsed).toHaveLength(2);
+                expect(response.body.data.needlesUsed[0].isPrimary).toBe(true);
+                expect(response.body.data.needlesUsed[1].isPrimary).toBe(false);
+            });
+
+            it("should create a project without needlesUsed (empty array)", async () => {
+                const projectData = {
+                    name: "No Needle Project",
+                    projectType: "knitting",
+                };
+
+                const response = await request(app).post("/api/projects").send(projectData).expect(201);
+
+                expect(response.body.success).toBe(true);
+                expect(response.body.data.needlesUsed).toEqual([]);
+            });
+
+            it("should create a project with hooksUsed", async () => {
+                const hook = await Hook.create({
+                    sizeMm: 5.0,
+                    sizeUs: "H/8",
+                    material: "aluminum",
+                    brand: "Clover",
+                });
+
+                const projectData = {
+                    name: "Crochet Blanket",
+                    projectType: "crochet",
+                    hooksUsed: [
+                        {
+                            hook: hook._id.toString(),
+                            isPrimary: true,
+                            notes: "Used for entire project",
+                        },
+                    ],
+                };
+
+                const response = await request(app).post("/api/projects").send(projectData).expect(201);
+
+                expect(response.body.success).toBe(true);
+                expect(response.body.data.hooksUsed).toHaveLength(1);
+                expect(response.body.data.hooksUsed[0].hook._id).toBe(hook._id.toString());
+                expect(response.body.data.hooksUsed[0].isPrimary).toBe(true);
+                expect(response.body.data.hooksUsed[0].notes).toBe("Used for entire project");
+            });
+
+            it("should create a project with multiple hooksUsed", async () => {
+                const hook1 = await Hook.create({ sizeMm: 5.0, sizeUs: "H/8" });
+                const hook2 = await Hook.create({ sizeMm: 4.0, sizeUs: "G/6" });
+
+                const projectData = {
+                    name: "Multi-Hook Project",
+                    projectType: "crochet",
+                    hooksUsed: [
+                        {
+                            hook: hook1._id.toString(),
+                            isPrimary: true,
+                            notes: "Main sections",
+                        },
+                        {
+                            hook: hook2._id.toString(),
+                            notes: "Detail work",
+                        },
+                    ],
+                };
+
+                const response = await request(app).post("/api/projects").send(projectData).expect(201);
+
+                expect(response.body.success).toBe(true);
+                expect(response.body.data.hooksUsed).toHaveLength(2);
+                expect(response.body.data.hooksUsed[0].isPrimary).toBe(true);
+                expect(response.body.data.hooksUsed[1].isPrimary).toBe(false);
+            });
+
+            it("should create a project without hooksUsed (empty array)", async () => {
+                const projectData = {
+                    name: "No Hook Project",
+                    projectType: "crochet",
+                };
+
+                const response = await request(app).post("/api/projects").send(projectData).expect(201);
+
+                expect(response.body.success).toBe(true);
+                expect(response.body.data.hooksUsed).toEqual([]);
+            });
+
+            it("should create a project with yarns, needles, and hooks", async () => {
+                const yarn = await Yarn.create({ name: "Test Yarn", brand: "Test Brand" });
+                const needle = await Needle.create({ sizeMm: 4.0, type: "circular" });
+                const hook = await Hook.create({ sizeMm: 5.0 });
+
+                const projectData = {
+                    name: "Complete Project",
+                    projectType: "knitting",
+                    yarnsUsed: [
+                        {
+                            yarn: yarn._id.toString(),
+                            quantityUsed: 2,
+                            isPrimary: true,
+                        },
+                    ],
+                    needlesUsed: [
+                        {
+                            needle: needle._id.toString(),
+                            isPrimary: true,
+                        },
+                    ],
+                    hooksUsed: [
+                        {
+                            hook: hook._id.toString(),
+                            notes: "Used for edging",
+                        },
+                    ],
+                };
+
+                const response = await request(app).post("/api/projects").send(projectData).expect(201);
+
+                expect(response.body.success).toBe(true);
+                expect(response.body.data.yarnsUsed).toHaveLength(1);
+                expect(response.body.data.needlesUsed).toHaveLength(1);
+                expect(response.body.data.hooksUsed).toHaveLength(1);
             });
         });
 
@@ -547,6 +726,112 @@ describe("POST /api/projects - Create Project", () => {
 
                 expect(response.body.success).toBe(false);
             });
+
+            it("should fail when needlesUsed contains invalid needle ID", async () => {
+                const projectData = {
+                    name: "My Project",
+                    projectType: "knitting",
+                    needlesUsed: [
+                        {
+                            needle: "invalid-id-format",
+                        },
+                    ],
+                };
+
+                const response = await request(app).post("/api/projects").send(projectData).expect(400);
+
+                expect(response.body.success).toBe(false);
+            });
+
+            it("should fail when needlesUsed contains duplicate needle IDs", async () => {
+                const needle = await Needle.create({ sizeMm: 4.0, type: "circular" });
+
+                const projectData = {
+                    name: "Duplicate Needle Project",
+                    projectType: "knitting",
+                    needlesUsed: [
+                        { needle: needle._id.toString() },
+                        { needle: needle._id.toString() },
+                    ],
+                };
+
+                const response = await request(app).post("/api/projects").send(projectData).expect(400);
+
+                expect(response.body.success).toBe(false);
+                expect(response.body.message).toContain("Cannot add the same needle multiple times");
+            });
+
+            it("should fail when multiple needles are marked as primary", async () => {
+                const needle1 = await Needle.create({ sizeMm: 4.0, type: "circular" });
+                const needle2 = await Needle.create({ sizeMm: 3.5, type: "dpn" });
+
+                const projectData = {
+                    name: "Multiple Primary Needles Project",
+                    projectType: "knitting",
+                    needlesUsed: [
+                        { needle: needle1._id.toString(), isPrimary: true },
+                        { needle: needle2._id.toString(), isPrimary: true },
+                    ],
+                };
+
+                const response = await request(app).post("/api/projects").send(projectData).expect(400);
+
+                expect(response.body.success).toBe(false);
+                expect(response.body.message).toContain("Only one needle can be marked as primary");
+            });
+
+            it("should fail when hooksUsed contains invalid hook ID", async () => {
+                const projectData = {
+                    name: "My Project",
+                    projectType: "crochet",
+                    hooksUsed: [
+                        {
+                            hook: "invalid-id-format",
+                        },
+                    ],
+                };
+
+                const response = await request(app).post("/api/projects").send(projectData).expect(400);
+
+                expect(response.body.success).toBe(false);
+            });
+
+            it("should fail when hooksUsed contains duplicate hook IDs", async () => {
+                const hook = await Hook.create({ sizeMm: 5.0 });
+
+                const projectData = {
+                    name: "Duplicate Hook Project",
+                    projectType: "crochet",
+                    hooksUsed: [
+                        { hook: hook._id.toString() },
+                        { hook: hook._id.toString() },
+                    ],
+                };
+
+                const response = await request(app).post("/api/projects").send(projectData).expect(400);
+
+                expect(response.body.success).toBe(false);
+                expect(response.body.message).toContain("Cannot add the same hook multiple times");
+            });
+
+            it("should fail when multiple hooks are marked as primary", async () => {
+                const hook1 = await Hook.create({ sizeMm: 5.0 });
+                const hook2 = await Hook.create({ sizeMm: 4.0 });
+
+                const projectData = {
+                    name: "Multiple Primary Hooks Project",
+                    projectType: "crochet",
+                    hooksUsed: [
+                        { hook: hook1._id.toString(), isPrimary: true },
+                        { hook: hook2._id.toString(), isPrimary: true },
+                    ],
+                };
+
+                const response = await request(app).post("/api/projects").send(projectData).expect(400);
+
+                expect(response.body.success).toBe(false);
+                expect(response.body.message).toContain("Only one hook can be marked as primary");
+            });
         });
 
         describe("GET cases", () => {
@@ -659,7 +944,7 @@ describe("POST /api/projects - Create Project", () => {
             expect(updatedAt).toBeInstanceOf(Date);
         });
 
-        it("should initialize empty arrays for photos, yarnsUsed, and additionalCosts", async () => {
+        it("should initialize empty arrays for photos, yarnsUsed, needlesUsed, hooksUsed, and additionalCosts", async () => {
             const projectData = {
                 name: "Array Test",
                 projectType: "knitting",
@@ -673,6 +958,10 @@ describe("POST /api/projects - Create Project", () => {
             expect(projectInDb.photos.length).toBe(0);
             expect(Array.isArray(projectInDb.yarnsUsed)).toBe(true);
             expect(projectInDb.yarnsUsed.length).toBe(0);
+            expect(Array.isArray(projectInDb.needlesUsed)).toBe(true);
+            expect(projectInDb.needlesUsed.length).toBe(0);
+            expect(Array.isArray(projectInDb.hooksUsed)).toBe(true);
+            expect(projectInDb.hooksUsed.length).toBe(0);
             expect(Array.isArray(projectInDb.additionalCosts)).toBe(true);
             expect(projectInDb.additionalCosts.length).toBe(0);
         });

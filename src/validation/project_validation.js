@@ -22,6 +22,24 @@ const projectValidation = {
                 }),
             )
             .default([]),
+        needlesUsed: Joi.array()
+            .items(
+                Joi.object({
+                    needle: Joi.string().pattern(/^[0-9a-fA-F]{24}$/).required(),
+                    isPrimary: Joi.boolean().default(false),
+                    notes: Joi.string().allow("").max(500),
+                }),
+            )
+            .default([]),
+        hooksUsed: Joi.array()
+            .items(
+                Joi.object({
+                    hook: Joi.string().pattern(/^[0-9a-fA-F]{24}$/).required(),
+                    isPrimary: Joi.boolean().default(false),
+                    notes: Joi.string().allow("").max(500),
+                }),
+            )
+            .default([]),
     }),
 
     updateProject: Joi.object({
@@ -63,6 +81,28 @@ const projectValidation = {
         quantityUnit: Joi.string().valid("skeins", "balls", "grams", "meters"),
         costPerUnit: Joi.number().min(0),
         currency: Joi.string().length(3).uppercase(),
+        notes: Joi.string().allow("").max(500),
+    }).min(1),
+
+    addNeedle: Joi.object({
+        needle: Joi.string().pattern(/^[0-9a-fA-F]{24}$/).required(),
+        isPrimary: Joi.boolean().default(false),
+        notes: Joi.string().allow("").max(500),
+    }),
+
+    updateNeedle: Joi.object({
+        isPrimary: Joi.boolean(),
+        notes: Joi.string().allow("").max(500),
+    }).min(1),
+
+    addHook: Joi.object({
+        hook: Joi.string().pattern(/^[0-9a-fA-F]{24}$/).required(),
+        isPrimary: Joi.boolean().default(false),
+        notes: Joi.string().allow("").max(500),
+    }),
+
+    updateHook: Joi.object({
+        isPrimary: Joi.boolean(),
         notes: Joi.string().allow("").max(500),
     }).min(1),
 

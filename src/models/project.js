@@ -52,6 +52,30 @@ const projectSchema = new Schema(
             },
         ],
 
+        needlesUsed: [
+            {
+                needle: {
+                    type: Schema.Types.ObjectId,
+                    ref: "Needle",
+                    required: true,
+                },
+                isPrimary: { type: Boolean, default: false },
+                notes: String,
+            },
+        ],
+
+        hooksUsed: [
+            {
+                hook: {
+                    type: Schema.Types.ObjectId,
+                    ref: "Hook",
+                    required: true,
+                },
+                isPrimary: { type: Boolean, default: false },
+                notes: String,
+            },
+        ],
+
         additionalCosts: [
             {
                 description: { type: String, required: true },
@@ -75,6 +99,8 @@ const projectSchema = new Schema(
 projectSchema.index({ status: 1 });
 projectSchema.index({ projectType: 1 });
 projectSchema.index({ "yarnsUsed.yarn": 1 });
+projectSchema.index({ "needlesUsed.needle": 1 });
+projectSchema.index({ "hooksUsed.hook": 1 });
 
 projectSchema.virtual("totalYarnCost").get(function () {
     return this.yarnsUsed.reduce((total, yarn) => {
