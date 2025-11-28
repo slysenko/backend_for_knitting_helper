@@ -1,5 +1,5 @@
-const mongoose = require("mongoose");
-const Schema = mongoose.Schema;
+import { Schema as _Schema, model } from "mongoose";
+const Schema = _Schema;
 
 const hookSchema = new Schema(
     {
@@ -18,6 +18,6 @@ const hookSchema = new Schema(
 
 hookSchema.index({ sizeMm: 1 });
 
-const Hook = mongoose.model("Hook", hookSchema);
+const Hook = model("Hook", hookSchema);
 
-module.exports = Hook;
+export default Hook;
