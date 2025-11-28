@@ -1,12 +1,17 @@
 import Yarn from "../models/yarn.js";
 import { NotFoundError, ConflictError } from "../middleware/errors.js";
 import { buildQuery } from "../utils/queryBuilder.js";
+import { extractPaginationParams, applyPagination } from "../utils/pagination.js";
 
 class YarnService {
     async getAll(filters = {}) {
         const query = buildQuery(filters);
-        const yarns = await Yarn.find(query).sort({ updatedAt: -1 });
-        return yarns;
+        const paginationParams = extractPaginationParams(filters);
+
+        return await applyPagination(Yarn, query, {
+            ...paginationParams,
+            sort: { updatedAt: -1 },
+        });
     }
 
     async getById(id) {

@@ -120,10 +120,11 @@ describe("Yarn Routes - Integration Tests", () => {
                 expect(response.status).toBe(200);
                 expect(response.body.success).toBe(true);
                 expect(response.body.data).toEqual([]);
-                expect(response.body.count).toBe(0);
+                expect(response.body.pagination).toBeDefined();
+                expect(response.body.pagination.total).toBe(0);
             });
 
-            it("should return all yarns", async () => {
+            it("should return all yarns with default pagination", async () => {
                 await Yarn.create([
                     { name: "Yarn 1", brand: "Brand A" },
                     { name: "Yarn 2", brand: "Brand B" },
@@ -133,7 +134,11 @@ describe("Yarn Routes - Integration Tests", () => {
 
                 expect(response.status).toBe(200);
                 expect(response.body.success).toBe(true);
-                expect(response.body.count).toBe(2);
+                expect(response.body.data).toHaveLength(2);
+                expect(response.body.pagination).toBeDefined();
+                expect(response.body.pagination.total).toBe(2);
+                expect(response.body.pagination.page).toBe(1);
+                expect(response.body.pagination.limit).toBe(20);
                 expect(response.body.data.map((y) => y.name)).toContain("Yarn 1");
                 expect(response.body.data.map((y) => y.name)).toContain("Yarn 2");
             });
@@ -147,7 +152,8 @@ describe("Yarn Routes - Integration Tests", () => {
                 const response = await request(app).get("/api/yarns?brand=Malabrigo");
 
                 expect(response.status).toBe(200);
-                expect(response.body.count).toBe(1);
+                expect(response.body.data).toHaveLength(1);
+                expect(response.body.pagination.total).toBe(1);
                 expect(response.body.data[0].name).toBe("Malabrigo Rios");
             });
 
@@ -160,7 +166,8 @@ describe("Yarn Routes - Integration Tests", () => {
                 const response = await request(app).get("/api/yarns?yarnType=Fingering");
 
                 expect(response.status).toBe(200);
-                expect(response.body.count).toBe(1);
+                expect(response.body.data).toHaveLength(1);
+                expect(response.body.pagination.total).toBe(1);
                 expect(response.body.data[0].name).toBe("Fingering Yarn");
             });
 
@@ -173,7 +180,8 @@ describe("Yarn Routes - Integration Tests", () => {
                 const response = await request(app).get("/api/yarns?color=Blue");
 
                 expect(response.status).toBe(200);
-                expect(response.body.count).toBe(1);
+                expect(response.body.data).toHaveLength(1);
+                expect(response.body.pagination.total).toBe(1);
                 expect(response.body.data[0].name).toBe("Blue Yarn");
             });
 
@@ -198,6 +206,178 @@ describe("Yarn Routes - Integration Tests", () => {
                 expect(response.status).toBe(200);
                 expect(response.body.data[0].name).toBe("Yarn 2");
                 expect(response.body.data[1].name).toBe("Yarn 1");
+            });
+
+            describe("Pagination", () => {
+                beforeEach(async () => {
+                    // Create 30 yarns for pagination testing
+                    const yarns = [];
+                    for (let i = 1; i <= 30; i++) {
+                        yarns.push({
+                            name: `Yarn ${i}`,
+                            brand: i % 3 === 0 ? "Brand A" : i % 3 === 1 ? "Brand B" : "Brand C",
+                            yarnType: i % 2 === 0 ? "Worsted" : "Fingering",
+                        });
+                    }
+                    await Yarn.create(yarns);
+                });
+
+                it("should paginate yarns with default limit (20)", async () => {
+                    const response = await request(app).get("/api/yarns?page=1");
+
+                    expect(response.status).toBe(200);
+                    expect(response.body.success).toBe(true);
+                    expect(response.body.data).toHaveLength(20);
+                    expect(response.body.pagination).toEqual({
+                        page: 1,
+                        limit: 20,
+                        total: 30,
+                        totalPages: 2,
+                        hasNext: true,
+                        hasPrev: false,
+                    });
+                });
+
+                it("should return second page of yarns", async () => {
+                    const response = await request(app).get("/api/yarns?page=2&limit=20");
+
+                    expect(response.status).toBe(200);
+                    expect(response.body.data).toHaveLength(10);
+                    expect(response.body.pagination).toEqual({
+                        page: 2,
+                        limit: 20,
+                        total: 30,
+                        totalPages: 2,
+                        hasNext: false,
+                        hasPrev: true,
+                    });
+                });
+
+                it("should paginate with custom limit", async () => {
+                    const response = await request(app).get("/api/yarns?page=1&limit=15");
+
+                    expect(response.status).toBe(200);
+                    expect(response.body.data).toHaveLength(15);
+                    expect(response.body.pagination).toEqual({
+                        page: 1,
+                        limit: 15,
+                        total: 30,
+                        totalPages: 2,
+                        hasNext: true,
+                        hasPrev: false,
+                    });
+                });
+
+                it("should return second page with custom limit", async () => {
+                    const response = await request(app).get("/api/yarns?page=2&limit=15");
+
+                    expect(response.status).toBe(200);
+                    expect(response.body.data).toHaveLength(15);
+                    expect(response.body.pagination).toEqual({
+                        page: 2,
+                        limit: 15,
+                        total: 30,
+                        totalPages: 2,
+                        hasNext: false,
+                        hasPrev: true,
+                    });
+                });
+
+                it("should handle page beyond available data", async () => {
+                    const response = await request(app).get("/api/yarns?page=10&limit=20");
+
+                    expect(response.status).toBe(200);
+                    expect(response.body.data).toHaveLength(0);
+                    expect(response.body.pagination.page).toBe(10);
+                    expect(response.body.pagination.total).toBe(30);
+                });
+
+                it("should combine pagination with filters (brand)", async () => {
+                    const response = await request(app).get("/api/yarns?brand=Brand A&page=1&limit=5");
+
+                    expect(response.status).toBe(200);
+                    expect(response.body.data).toHaveLength(5);
+                    expect(response.body.pagination.total).toBe(10); // 10 Brand A yarns out of 30
+                    expect(response.body.pagination.totalPages).toBe(2);
+                    expect(response.body.data.every((y) => y.brand === "Brand A")).toBe(true);
+                });
+
+                it("should combine pagination with filters (yarnType)", async () => {
+                    const response = await request(app).get("/api/yarns?yarnType=Worsted&page=1&limit=10");
+
+                    expect(response.status).toBe(200);
+                    expect(response.body.data).toHaveLength(10);
+                    expect(response.body.pagination.total).toBe(15); // 15 Worsted yarns out of 30
+                    expect(response.body.pagination.totalPages).toBe(2);
+                    expect(response.body.data.every((y) => y.yarnType === "Worsted")).toBe(true);
+                });
+
+                it("should combine pagination with multiple filters", async () => {
+                    const response = await request(app).get("/api/yarns?brand=Brand B&yarnType=Fingering&page=1&limit=5");
+
+                    expect(response.status).toBe(200);
+                    // Brand B (i % 3 === 1) and Fingering (i % 2 === 1) = items 1, 7, 13, 19, 25
+                    expect(response.body.pagination.total).toBe(5);
+                    expect(response.body.data.every((y) => y.brand === "Brand B" && y.yarnType === "Fingering")).toBe(true);
+                });
+
+                it("should handle invalid page number (negative)", async () => {
+                    const response = await request(app).get("/api/yarns?page=-1");
+
+                    expect(response.status).toBe(200);
+                    expect(response.body.pagination.page).toBe(1); // Should default to page 1
+                });
+
+                it("should handle invalid page number (zero)", async () => {
+                    const response = await request(app).get("/api/yarns?page=0");
+
+                    expect(response.status).toBe(200);
+                    expect(response.body.pagination.page).toBe(1); // Should default to page 1
+                });
+
+                it("should cap limit at maximum (100)", async () => {
+                    const response = await request(app).get("/api/yarns?limit=500");
+
+                    expect(response.status).toBe(200);
+                    expect(response.body.pagination.limit).toBe(100); // Should cap at 100
+                });
+
+                it("should handle non-numeric page parameter", async () => {
+                    const response = await request(app).get("/api/yarns?page=abc");
+
+                    expect(response.status).toBe(200);
+                    expect(response.body.pagination.page).toBe(1); // Should default to page 1
+                });
+
+                it("should handle non-numeric limit parameter", async () => {
+                    const response = await request(app).get("/api/yarns?limit=xyz");
+
+                    expect(response.status).toBe(200);
+                    expect(response.body.pagination.limit).toBe(20); // Should default to 20
+                });
+
+                it("should not interfere with yarn filters (page and limit should be excluded from query)", async () => {
+                    const response = await request(app).get("/api/yarns?page=1&limit=10&brand=Brand A");
+
+                    expect(response.status).toBe(200);
+                    // Should filter by brand, not treat page/limit as filter fields
+                    expect(response.body.data.every((y) => y.brand === "Brand A")).toBe(true);
+                });
+
+                it("should handle pagination with very small limit", async () => {
+                    const response = await request(app).get("/api/yarns?page=5&limit=3");
+
+                    expect(response.status).toBe(200);
+                    expect(response.body.data).toHaveLength(3);
+                    expect(response.body.pagination).toEqual({
+                        page: 5,
+                        limit: 3,
+                        total: 30,
+                        totalPages: 10,
+                        hasNext: true,
+                        hasPrev: true,
+                    });
+                });
             });
         });
 
@@ -755,7 +935,7 @@ describe("Yarn Routes - Integration Tests", () => {
             const response = await request(app).get("/api/yarns?brand=Brand A&yarnType=Worsted&color=Red");
 
             expect(response.status).toBe(200);
-            expect(response.body.count).toBe(1);
+            expect(response.body.pagination.total).toBe(1);
             expect(response.body.data[0].name).toBe("Red Worsted");
         });
     });

@@ -6,17 +6,28 @@ const projectValidation = {
         name: Joi.string().required().trim().min(1).max(200),
         comments: Joi.string().allow("").max(2000),
         projectType: Joi.string().valid("knitting", "crochet").required(),
-        primaryYarn: Joi.string().pattern(/^[0-9a-fA-F]{24}$/),
         status: Joi.string().valid("active", "completed", "frogged", "hibernating").default("active"),
         startDate: Joi.date().iso(),
         completionDate: Joi.date().iso().greater(Joi.ref("startDate")),
+        yarnsUsed: Joi.array()
+            .items(
+                Joi.object({
+                    yarn: Joi.string().pattern(/^[0-9a-fA-F]{24}$/).required(),
+                    isPrimary: Joi.boolean().default(false),
+                    quantityUsed: Joi.number().positive().required(),
+                    quantityUnit: Joi.string().valid("skeins", "balls", "grams", "meters").default("skeins"),
+                    costPerUnit: Joi.number().min(0),
+                    currency: Joi.string().length(3).uppercase().default("EUR"),
+                    notes: Joi.string().allow("").max(500),
+                }),
+            )
+            .default([]),
     }),
 
     updateProject: Joi.object({
         name: Joi.string().trim().min(1).max(200),
         comments: Joi.string().allow("").max(2000),
         projectType: Joi.string().valid("knitting", "crochet"),
-        primaryYarn: Joi.string().pattern(/^[0-9a-fA-F]{24}$/),
         status: Joi.string().valid("active", "completed", "frogged", "hibernating"),
         startDate: Joi.date().iso(),
         completionDate: Joi.date().iso(),
@@ -39,6 +50,7 @@ const projectValidation = {
         yarn: Joi.string()
             .pattern(/^[0-9a-fA-F]{24}$/)
             .required(),
+        isPrimary: Joi.boolean().default(false),
         quantityUsed: Joi.number().positive().required(),
         quantityUnit: Joi.string().valid("skeins", "balls", "grams", "meters").default("skeins"),
         costPerUnit: Joi.number().min(0),

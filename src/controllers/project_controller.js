@@ -3,11 +3,11 @@ import ProjectService from "../services/project_service.js";
 class ProjectController {
     async getProjects(req, res, next) {
         try {
-            const projects = await ProjectService.getAll(req.query);
+            const result = await ProjectService.getAll(req.query);
             res.json({
                 success: true,
-                data: projects,
-                count: projects.length,
+                data: result.data,
+                pagination: result.pagination,
             });
         } catch (error) {
             next(error);

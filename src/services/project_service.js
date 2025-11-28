@@ -1,16 +1,18 @@
 import Project from "../models/project.js";
 import { NotFoundError, ValidationError, ConflictError } from "../middleware/errors.js";
 import { buildQuery } from "../utils/queryBuilder.js";
+import { extractPaginationParams, applyPagination } from "../utils/pagination.js";
 
 class ProjectService {
     async getAll(filters = {}) {
         const query = buildQuery(filters);
+        const paginationParams = extractPaginationParams(filters);
 
-        const projects = await Project.find(query)
-            .populate("yarnsUsed.yarn")
-            .sort({ updatedAt: -1 });
-
-        return projects;
+        return await applyPagination(Project, query, {
+            ...paginationParams,
+            populate: "yarnsUsed.yarn",
+            sort: { updatedAt: -1 },
+        });
     }
 
     async getById(id) {
@@ -27,7 +29,6 @@ class ProjectService {
         if (data.yarnsUsed && data.yarnsUsed.length > 0) {
             const yarnIds = data.yarnsUsed.map((y) => y.yarn.toString());
             const uniqueYarnIds = [...new Set(yarnIds)];
-
             if (yarnIds.length !== uniqueYarnIds.length) {
                 throw new ValidationError("Cannot add the same yarn multiple times to a project");
             }
@@ -106,7 +107,7 @@ class ProjectService {
             throw new NotFoundError("Project");
         }
 
-        const existingYarn = project.yarnsUsed.find((y) => y.yarn.toString() === yarnData.yarn);
+        const existingYarn = project.yarnsUsed.find((y) => y.id.toString() === yarnData.yarn);
 
         if (existingYarn) {
             throw new ConflictError("Yarn already added to this project");
@@ -132,7 +133,7 @@ class ProjectService {
             throw new NotFoundError("Project");
         }
 
-        const yarnUsage = project.yarnsUsed.id(yarnUsageId);
+        const yarnUsage = project.yarnsUsed.yarn(yarnUsageId);
 
         if (!yarnUsage) {
             throw new NotFoundError("Yarn usage");
@@ -152,7 +153,7 @@ class ProjectService {
             throw new NotFoundError("Project");
         }
 
-        const yarnUsage = project.yarnsUsed.id(yarnUsageId);
+        const yarnUsage = project.yarnsUsed.yarn(yarnUsageId);
 
         if (!yarnUsage) {
             throw new NotFoundError("Yarn usage");

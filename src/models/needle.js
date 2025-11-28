@@ -1,5 +1,5 @@
-const mongoose = require("mongoose");
-const Schema = mongoose.Schema;
+import { Schema as _Schema, model } from "mongoose";
+const Schema = _Schema;
 
 const needleSchema = new Schema(
     {
@@ -24,6 +24,6 @@ const needleSchema = new Schema(
 
 needleSchema.index({ sizeMm: 1 });
 
-const Needle = mongoose.model("Needle", needleSchema);
+const Needle = model("Needle", needleSchema);
 
-module.exports = Needle;
+export default Needle;

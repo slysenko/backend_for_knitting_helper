@@ -173,10 +173,11 @@ describe("POST /api/projects - Create Project", () => {
                 expect(response.status).toBe(200);
                 expect(response.body.success).toBe(true);
                 expect(response.body.data).toEqual([]);
-                expect(response.body.count).toBe(0);
+                expect(response.body.pagination).toBeDefined();
+                expect(response.body.pagination.total).toBe(0);
             });
 
-            it("should return all projects", async () => {
+            it("should return all projects with default pagination", async () => {
                 await Project.create([
                     { name: "Project 1", projectType: "knitting" },
                     { name: "Project 2", projectType: "crochet" },
@@ -186,7 +187,11 @@ describe("POST /api/projects - Create Project", () => {
 
                 expect(response.status).toBe(200);
                 expect(response.body.success).toBe(true);
-                expect(response.body.count).toBe(2);
+                expect(response.body.data).toHaveLength(2);
+                expect(response.body.pagination).toBeDefined();
+                expect(response.body.pagination.total).toBe(2);
+                expect(response.body.pagination.page).toBe(1);
+                expect(response.body.pagination.limit).toBe(20);
                 expect(response.body.data.map((p) => p.name)).toContain("Project 1");
                 expect(response.body.data.map((p) => p.name)).toContain("Project 2");
             });
@@ -200,7 +205,8 @@ describe("POST /api/projects - Create Project", () => {
                 const response = await request(app).get("/api/projects?projectType=knitting");
 
                 expect(response.status).toBe(200);
-                expect(response.body.count).toBe(1);
+                expect(response.body.data).toHaveLength(1);
+                expect(response.body.pagination.total).toBe(1);
                 expect(response.body.data[0].name).toBe("Knitting Project");
             });
 
@@ -213,6 +219,143 @@ describe("POST /api/projects - Create Project", () => {
                 expect(response.body.success).toBe(true);
                 expect(response.body.data._id).toBe(project._id.toString());
                 expect(response.body.data.name).toBe("Single Project");
+            });
+
+            describe("Pagination", () => {
+                beforeEach(async () => {
+                    // Create 25 projects for pagination testing
+                    const projects = [];
+                    for (let i = 1; i <= 25; i++) {
+                        projects.push({
+                            name: `Project ${i}`,
+                            projectType: i % 2 === 0 ? "crochet" : "knitting",
+                        });
+                    }
+                    await Project.create(projects);
+                });
+
+                it("should paginate projects with default limit (20)", async () => {
+                    const response = await request(app).get("/api/projects?page=1");
+
+                    expect(response.status).toBe(200);
+                    expect(response.body.success).toBe(true);
+                    expect(response.body.data).toHaveLength(20);
+                    expect(response.body.pagination).toEqual({
+                        page: 1,
+                        limit: 20,
+                        total: 25,
+                        totalPages: 2,
+                        hasNext: true,
+                        hasPrev: false,
+                    });
+                });
+
+                it("should return second page of projects", async () => {
+                    const response = await request(app).get("/api/projects?page=2&limit=20");
+
+                    expect(response.status).toBe(200);
+                    expect(response.body.data).toHaveLength(5);
+                    expect(response.body.pagination).toEqual({
+                        page: 2,
+                        limit: 20,
+                        total: 25,
+                        totalPages: 2,
+                        hasNext: false,
+                        hasPrev: true,
+                    });
+                });
+
+                it("should paginate with custom limit", async () => {
+                    const response = await request(app).get("/api/projects?page=1&limit=10");
+
+                    expect(response.status).toBe(200);
+                    expect(response.body.data).toHaveLength(10);
+                    expect(response.body.pagination).toEqual({
+                        page: 1,
+                        limit: 10,
+                        total: 25,
+                        totalPages: 3,
+                        hasNext: true,
+                        hasPrev: false,
+                    });
+                });
+
+                it("should return third page with custom limit", async () => {
+                    const response = await request(app).get("/api/projects?page=3&limit=10");
+
+                    expect(response.status).toBe(200);
+                    expect(response.body.data).toHaveLength(5);
+                    expect(response.body.pagination).toEqual({
+                        page: 3,
+                        limit: 10,
+                        total: 25,
+                        totalPages: 3,
+                        hasNext: false,
+                        hasPrev: true,
+                    });
+                });
+
+                it("should handle page beyond available data", async () => {
+                    const response = await request(app).get("/api/projects?page=10&limit=20");
+
+                    expect(response.status).toBe(200);
+                    expect(response.body.data).toHaveLength(0);
+                    expect(response.body.pagination.page).toBe(10);
+                    expect(response.body.pagination.total).toBe(25);
+                });
+
+                it("should combine pagination with filters", async () => {
+                    const response = await request(app).get("/api/projects?projectType=knitting&page=1&limit=5");
+
+                    expect(response.status).toBe(200);
+                    expect(response.body.data).toHaveLength(5);
+                    expect(response.body.pagination.total).toBe(13); // 13 knitting projects out of 25
+                    expect(response.body.pagination.totalPages).toBe(3);
+                    expect(response.body.data.every((p) => p.projectType === "knitting")).toBe(true);
+                });
+
+                it("should handle invalid page number (negative)", async () => {
+                    const response = await request(app).get("/api/projects?page=-1");
+
+                    expect(response.status).toBe(200);
+                    expect(response.body.pagination.page).toBe(1); // Should default to page 1
+                });
+
+                it("should handle invalid page number (zero)", async () => {
+                    const response = await request(app).get("/api/projects?page=0");
+
+                    expect(response.status).toBe(200);
+                    expect(response.body.pagination.page).toBe(1); // Should default to page 1
+                });
+
+                it("should cap limit at maximum (100)", async () => {
+                    const response = await request(app).get("/api/projects?limit=200");
+
+                    expect(response.status).toBe(200);
+                    expect(response.body.pagination.limit).toBe(100); // Should cap at 100
+                });
+
+                it("should handle non-numeric page parameter", async () => {
+                    const response = await request(app).get("/api/projects?page=abc");
+
+                    expect(response.status).toBe(200);
+                    expect(response.body.pagination.page).toBe(1); // Should default to page 1
+                });
+
+                it("should handle non-numeric limit parameter", async () => {
+                    const response = await request(app).get("/api/projects?limit=xyz");
+
+                    expect(response.status).toBe(200);
+                    expect(response.body.pagination.limit).toBe(20); // Should default to 20
+                });
+
+                it("should not interfere with project filters (page and limit should be excluded from query)", async () => {
+                    const response = await request(app).get("/api/projects?page=1&limit=10&status=active");
+
+                    expect(response.status).toBe(200);
+                    // Should filter by status, not treat page/limit as filter fields
+                    expect(response.body.data.every((p) => p.status === "active")).toBe(true);
+                });
             });
         });
 

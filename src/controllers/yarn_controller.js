@@ -3,12 +3,12 @@ import YarnService from "../services/yarn_service.js";
 class YarnController {
     async getYarns(req, res, next) {
         try {
-            const yarns = await YarnService.getAll(req.query);
+            const result = await YarnService.getAll(req.query);
 
             res.json({
                 success: true,
-                data: yarns,
-                count: yarns.length,
+                data: result.data,
+                pagination: result.pagination,
             });
         } catch (error) {
             next(error);
