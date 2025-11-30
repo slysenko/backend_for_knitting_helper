@@ -2,6 +2,7 @@ import request from "supertest";
 import mongoose from "mongoose";
 import app from "../../app.js";
 import Yarn from "../../models/yarn.js";
+import Project from "../../models/project.js";
 
 describe("Yarn Routes - Integration Tests", () => {
     describe("Success Cases", () => {
@@ -937,6 +938,97 @@ describe("Yarn Routes - Integration Tests", () => {
             expect(response.status).toBe(200);
             expect(response.body.pagination.total).toBe(1);
             expect(response.body.data[0].name).toBe("Red Worsted");
+        });
+
+        describe("Project Count", () => {
+            it("should return projectCount of 0 when yarn is not used in any projects", async () => {
+                const yarn = await Yarn.create({ name: "Unused Yarn" });
+
+                const response = await request(app).get(`/api/yarns/${yarn._id}`).expect(200);
+
+                expect(response.body.success).toBe(true);
+                expect(response.body.data.projectCount).toBe(0);
+            });
+
+            it("should return correct projectCount when yarn is used in projects", async () => {
+                const yarn = await Yarn.create({ name: "Popular Yarn", brand: "Test Brand" });
+
+                await Project.create({
+                    name: "Project 1",
+                    projectType: "knitting",
+                    yarnsUsed: [{ yarn: yarn._id, quantityUsed: 2 }],
+                });
+                await Project.create({
+                    name: "Project 2",
+                    projectType: "knitting",
+                    yarnsUsed: [{ yarn: yarn._id, quantityUsed: 1 }],
+                });
+                await Project.create({
+                    name: "Project 3",
+                    projectType: "crochet",
+                    yarnsUsed: [{ yarn: yarn._id, quantityUsed: 3 }],
+                });
+
+                const response = await request(app).get(`/api/yarns/${yarn._id}`).expect(200);
+
+                expect(response.body.success).toBe(true);
+                expect(response.body.data.projectCount).toBe(3);
+            });
+
+            it("should include projectCount in list response", async () => {
+                const yarn1 = await Yarn.create({ name: "Yarn with 2 projects" });
+                const yarn2 = await Yarn.create({ name: "Yarn with 1 project" });
+                const yarn3 = await Yarn.create({ name: "Yarn with 0 projects" });
+
+                await Project.create({
+                    name: "Project A",
+                    projectType: "knitting",
+                    yarnsUsed: [{ yarn: yarn1._id, quantityUsed: 1 }],
+                });
+                await Project.create({
+                    name: "Project B",
+                    projectType: "knitting",
+                    yarnsUsed: [{ yarn: yarn1._id, quantityUsed: 1 }],
+                });
+                await Project.create({
+                    name: "Project C",
+                    projectType: "knitting",
+                    yarnsUsed: [{ yarn: yarn2._id, quantityUsed: 1 }],
+                });
+
+                const response = await request(app).get("/api/yarns").expect(200);
+
+                expect(response.body.success).toBe(true);
+                expect(response.body.data.length).toBeGreaterThanOrEqual(3);
+
+                const yarnWithCount2 = response.body.data.find((y) => y._id === yarn1._id.toString());
+                const yarnWithCount1 = response.body.data.find((y) => y._id === yarn2._id.toString());
+                const yarnWithCount0 = response.body.data.find((y) => y._id === yarn3._id.toString());
+
+                expect(yarnWithCount2.projectCount).toBe(2);
+                expect(yarnWithCount1.projectCount).toBe(1);
+                expect(yarnWithCount0.projectCount).toBe(0);
+            });
+
+            it("should populate usedInProjects with project details", async () => {
+                const yarn = await Yarn.create({ name: "Yarn with Projects" });
+
+                await Project.create({
+                    name: "Sweater Project",
+                    projectType: "knitting",
+                    status: "active",
+                    yarnsUsed: [{ yarn: yarn._id, quantityUsed: 5 }],
+                });
+
+                const response = await request(app).get(`/api/yarns/${yarn._id}`).expect(200);
+
+                expect(response.body.success).toBe(true);
+                expect(response.body.data.usedInProjects).toHaveLength(1);
+                expect(response.body.data.usedInProjects[0].name).toBe("Sweater Project");
+                expect(response.body.data.usedInProjects[0].projectType).toBe("knitting");
+                expect(response.body.data.usedInProjects[0].status).toBe("active");
+                expect(response.body.data.projectCount).toBe(1);
+            });
         });
     });
 });

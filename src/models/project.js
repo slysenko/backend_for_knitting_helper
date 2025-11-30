@@ -103,12 +103,14 @@ projectSchema.index({ "needlesUsed.needle": 1 });
 projectSchema.index({ "hooksUsed.hook": 1 });
 
 projectSchema.virtual("totalYarnCost").get(function () {
+    if (!this.yarnsUsed || !Array.isArray(this.yarnsUsed)) return 0;
     return this.yarnsUsed.reduce((total, yarn) => {
         return total + yarn.quantityUsed * (yarn.costPerUnit || 0);
     }, 0);
 });
 
 projectSchema.virtual("totalAdditionalCost").get(function () {
+    if (!this.additionalCosts || !Array.isArray(this.additionalCosts)) return 0;
     return this.additionalCosts.reduce((total, cost) => {
         return total + cost.amount;
     }, 0);
@@ -119,6 +121,7 @@ projectSchema.virtual("totalProjectCost").get(function () {
 });
 
 projectSchema.virtual("primaryYarn").get(function () {
+    if (!this.yarnsUsed || !Array.isArray(this.yarnsUsed)) return null;
     return this.yarnsUsed.find((y) => y.isPrimary);
 });
 

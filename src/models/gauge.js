@@ -1,5 +1,5 @@
-const mongoose = require("mongoose");
-const Schema = mongoose.Schema;
+import { Schema as _Schema, model } from "mongoose";
+const Schema = _Schema;
 
 const gaugeSchema = new Schema(
     {
@@ -9,6 +9,11 @@ const gaugeSchema = new Schema(
             required: true,
         },
         name: { type: String, required: true },
+        gaugeType: {
+            type: String,
+            enum: ["blocked", "unblocked"],
+            required: true,
+        },
         comments: String,
         yarn: {
             type: Schema.Types.ObjectId,
@@ -68,6 +73,6 @@ gaugeSchema.set("toObject", { virtuals: true });
 
 gaugeSchema.index({ project: 1 });
 
-const Gauge = mongoose.model("Gauge", gaugeSchema);
+const Gauge = model("Gauge", gaugeSchema);
 
-module.exports = Gauge;
+export default Gauge;

@@ -2,6 +2,7 @@ import request from "supertest";
 import mongoose from "mongoose";
 import app from "../../app.js";
 import Needle from "../../models/needle.js";
+import Project from "../../models/project.js";
 
 describe("Needle Routes - Integration Tests", () => {
     describe("Success Cases", () => {
@@ -889,6 +890,98 @@ describe("Needle Routes - Integration Tests", () => {
             const response = await request(app).post("/api/needles").send(needleData).expect(201);
 
             expect(response.body.data.lengthCm).toBe(80.5);
+        });
+
+        describe("Project Count", () => {
+            it("should return projectCount of 0 when needle is not used in any projects", async () => {
+                const needle = await Needle.create({ sizeMm: 4.0, type: "circular" });
+
+                const response = await request(app).get(`/api/needles/${needle._id}`).expect(200);
+
+                expect(response.body.success).toBe(true);
+                expect(response.body.data.projectCount).toBe(0);
+            });
+
+            it("should return correct projectCount when needle is used in projects", async () => {
+                const needle = await Needle.create({ sizeMm: 5.0, type: "circular", brand: "ChiaoGoo" });
+
+                // Create 2 projects using this needle
+                await Project.create({
+                    name: "Sweater Project",
+                    projectType: "knitting",
+                    needlesUsed: [{ needle: needle._id, isPrimary: true }],
+                });
+                await Project.create({
+                    name: "Hat Project",
+                    projectType: "knitting",
+                    needlesUsed: [{ needle: needle._id }],
+                });
+
+                const response = await request(app).get(`/api/needles/${needle._id}`).expect(200);
+
+                expect(response.body.success).toBe(true);
+                expect(response.body.data.projectCount).toBe(2);
+            });
+
+            it("should include projectCount in list response", async () => {
+                const needle1 = await Needle.create({ sizeMm: 3.5, type: "dpn" });
+                const needle2 = await Needle.create({ sizeMm: 4.0, type: "circular" });
+                const needle3 = await Needle.create({ sizeMm: 5.0, type: "straight" });
+
+                await Project.create({
+                    name: "Project A",
+                    projectType: "knitting",
+                    needlesUsed: [{ needle: needle1._id }],
+                });
+                await Project.create({
+                    name: "Project B",
+                    projectType: "knitting",
+                    needlesUsed: [{ needle: needle1._id }],
+                });
+                await Project.create({
+                    name: "Project C",
+                    projectType: "knitting",
+                    needlesUsed: [{ needle: needle1._id }],
+                });
+                await Project.create({
+                    name: "Project D",
+                    projectType: "knitting",
+                    needlesUsed: [{ needle: needle2._id }],
+                });
+
+                const response = await request(app).get("/api/needles").expect(200);
+
+                expect(response.body.success).toBe(true);
+                expect(response.body.data.length).toBeGreaterThanOrEqual(3);
+
+                const needleWithCount3 = response.body.data.find((n) => n._id === needle1._id.toString());
+                const needleWithCount1 = response.body.data.find((n) => n._id === needle2._id.toString());
+                const needleWithCount0 = response.body.data.find((n) => n._id === needle3._id.toString());
+
+                expect(needleWithCount3.projectCount).toBe(3);
+                expect(needleWithCount1.projectCount).toBe(1);
+                expect(needleWithCount0.projectCount).toBe(0);
+            });
+
+            it("should populate usedInProjects with project details", async () => {
+                const needle = await Needle.create({ sizeMm: 6.0, type: "circular" });
+
+                await Project.create({
+                    name: "Blanket Project",
+                    projectType: "knitting",
+                    status: "active",
+                    needlesUsed: [{ needle: needle._id, isPrimary: true, notes: "Main needle" }],
+                });
+
+                const response = await request(app).get(`/api/needles/${needle._id}`).expect(200);
+
+                expect(response.body.success).toBe(true);
+                expect(response.body.data.usedInProjects).toHaveLength(1);
+                expect(response.body.data.usedInProjects[0].name).toBe("Blanket Project");
+                expect(response.body.data.usedInProjects[0].projectType).toBe("knitting");
+                expect(response.body.data.usedInProjects[0].status).toBe("active");
+                expect(response.body.data.projectCount).toBe(1);
+            });
         });
     });
 });

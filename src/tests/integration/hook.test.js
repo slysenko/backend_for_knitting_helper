@@ -2,6 +2,7 @@ import request from "supertest";
 import mongoose from "mongoose";
 import app from "../../app.js";
 import Hook from "../../models/hook.js";
+import Project from "../../models/project.js";
 
 describe("Hook Routes - Integration Tests", () => {
     describe("Success Cases", () => {
@@ -801,6 +802,98 @@ describe("Hook Routes - Integration Tests", () => {
             const response = await request(app).post("/api/hooks").send(hookData).expect(201);
 
             expect(response.body.data.price).toBe(12.99);
+        });
+
+        describe("Project Count", () => {
+            it("should return projectCount of 0 when hook is not used in any projects", async () => {
+                const hook = await Hook.create({ sizeMm: 5.0 });
+
+                const response = await request(app).get(`/api/hooks/${hook._id}`).expect(200);
+
+                expect(response.body.success).toBe(true);
+                expect(response.body.data.projectCount).toBe(0);
+            });
+
+            it("should return correct projectCount when hook is used in projects", async () => {
+                const hook = await Hook.create({ sizeMm: 6.0, sizeUs: "J/10", brand: "Clover" });
+
+                // Create 3 projects using this hook
+                await Project.create({
+                    name: "Amigurumi Project",
+                    projectType: "crochet",
+                    hooksUsed: [{ hook: hook._id, isPrimary: true }],
+                });
+                await Project.create({
+                    name: "Blanket Project",
+                    projectType: "crochet",
+                    hooksUsed: [{ hook: hook._id }],
+                });
+                await Project.create({
+                    name: "Scarf Project",
+                    projectType: "crochet",
+                    hooksUsed: [{ hook: hook._id, notes: "Main hook" }],
+                });
+
+                const response = await request(app).get(`/api/hooks/${hook._id}`).expect(200);
+
+                expect(response.body.success).toBe(true);
+                expect(response.body.data.projectCount).toBe(3);
+            });
+
+            it("should include projectCount in list response", async () => {
+                const hook1 = await Hook.create({ sizeMm: 4.0, sizeUs: "G/6" });
+                const hook2 = await Hook.create({ sizeMm: 5.0, sizeUs: "H/8" });
+                const hook3 = await Hook.create({ sizeMm: 6.0, sizeUs: "J/10" });
+
+                await Project.create({
+                    name: "Project A",
+                    projectType: "crochet",
+                    hooksUsed: [{ hook: hook1._id }],
+                });
+                await Project.create({
+                    name: "Project B",
+                    projectType: "crochet",
+                    hooksUsed: [{ hook: hook2._id }],
+                });
+                await Project.create({
+                    name: "Project C",
+                    projectType: "crochet",
+                    hooksUsed: [{ hook: hook2._id }],
+                });
+
+                const response = await request(app).get("/api/hooks").expect(200);
+
+                expect(response.body.success).toBe(true);
+                expect(response.body.data.length).toBeGreaterThanOrEqual(3);
+
+                const hookWithCount1 = response.body.data.find((h) => h._id === hook1._id.toString());
+                const hookWithCount2 = response.body.data.find((h) => h._id === hook2._id.toString());
+                const hookWithCount0 = response.body.data.find((h) => h._id === hook3._id.toString());
+
+                expect(hookWithCount1.projectCount).toBe(1);
+                expect(hookWithCount2.projectCount).toBe(2);
+                expect(hookWithCount0.projectCount).toBe(0);
+            });
+
+            it("should populate usedInProjects with project details", async () => {
+                const hook = await Hook.create({ sizeMm: 7.0, sizeUs: "K/10.5" });
+
+                await Project.create({
+                    name: "Granny Square Blanket",
+                    projectType: "crochet",
+                    status: "completed",
+                    hooksUsed: [{ hook: hook._id, isPrimary: true }],
+                });
+
+                const response = await request(app).get(`/api/hooks/${hook._id}`).expect(200);
+
+                expect(response.body.success).toBe(true);
+                expect(response.body.data.usedInProjects).toHaveLength(1);
+                expect(response.body.data.usedInProjects[0].name).toBe("Granny Square Blanket");
+                expect(response.body.data.usedInProjects[0].projectType).toBe("crochet");
+                expect(response.body.data.usedInProjects[0].status).toBe("completed");
+                expect(response.body.data.projectCount).toBe(1);
+            });
         });
     });
 });

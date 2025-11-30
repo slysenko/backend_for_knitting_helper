@@ -1,4 +1,5 @@
 import Hook from "../models/hook.js";
+import Project from "../models/project.js";
 import { NotFoundError } from "../middleware/errors.js";
 import { buildQuery } from "../utils/queryBuilder.js";
 import { extractPaginationParams, applyPagination } from "../utils/pagination.js";
@@ -8,20 +9,46 @@ class HookService {
         const query = buildQuery(filters);
         const paginationParams = extractPaginationParams(filters);
 
-        return await applyPagination(Hook, query, {
+        const result = await applyPagination(Hook, query, {
             ...paginationParams,
             sort: { sizeMm: 1 },
         });
+
+        if (result.data && result.data.length > 0) {
+            const hookIds = result.data.map((hook) => hook._id);
+            const projectCounts = await Project.aggregate([
+                { $match: { "hooksUsed.hook": { $in: hookIds } } },
+                { $unwind: "$hooksUsed" },
+                { $match: { "hooksUsed.hook": { $in: hookIds } } },
+                { $group: { _id: "$hooksUsed.hook", count: { $sum: 1 } } },
+            ]);
+
+            const countMap = new Map(projectCounts.map((item) => [item._id.toString(), item.count]));
+
+            result.data = result.data.map((hook) => {
+                const hookObj = hook.toObject();
+                hookObj.projectCount = countMap.get(hook._id.toString()) || 0;
+                return hookObj;
+            });
+        }
+
+        return result;
     }
 
     async getById(id) {
-        const hook = await Hook.findById(id);
+        const hook = await Hook.findById(id).populate({
+            path: "usedInProjects",
+            select: "name projectType status startDate completionDate",
+        });
 
         if (!hook) {
             throw new NotFoundError("Hook");
         }
 
-        return hook;
+        const hookObj = hook.toObject();
+        hookObj.projectCount = hookObj.usedInProjects ? hookObj.usedInProjects.length : 0;
+
+        return hookObj;
     }
 
     async create(data) {

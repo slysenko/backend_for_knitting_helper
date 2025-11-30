@@ -24,6 +24,15 @@ const needleSchema = new Schema(
 
 needleSchema.index({ sizeMm: 1 });
 
+needleSchema.virtual("usedInProjects", {
+    ref: "Project",
+    localField: "_id",
+    foreignField: "needlesUsed.needle",
+});
+
+needleSchema.set("toJSON", { virtuals: true });
+needleSchema.set("toObject", { virtuals: true });
+
 const Needle = model("Needle", needleSchema);
 
 export default Needle;

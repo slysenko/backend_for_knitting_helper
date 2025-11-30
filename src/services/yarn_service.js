@@ -1,4 +1,5 @@
 import Yarn from "../models/yarn.js";
+import Project from "../models/project.js";
 import { NotFoundError, ConflictError } from "../middleware/errors.js";
 import { buildQuery } from "../utils/queryBuilder.js";
 import { extractPaginationParams, applyPagination } from "../utils/pagination.js";
@@ -8,10 +9,30 @@ class YarnService {
         const query = buildQuery(filters);
         const paginationParams = extractPaginationParams(filters);
 
-        return await applyPagination(Yarn, query, {
+        const result = await applyPagination(Yarn, query, {
             ...paginationParams,
             sort: { updatedAt: -1 },
         });
+
+        if (result.data && result.data.length > 0) {
+            const yarnIds = result.data.map((yarn) => yarn._id);
+            const projectCounts = await Project.aggregate([
+                { $match: { "yarnsUsed.yarn": { $in: yarnIds } } },
+                { $unwind: "$yarnsUsed" },
+                { $match: { "yarnsUsed.yarn": { $in: yarnIds } } },
+                { $group: { _id: "$yarnsUsed.yarn", count: { $sum: 1 } } },
+            ]);
+
+            const countMap = new Map(projectCounts.map((item) => [item._id.toString(), item.count]));
+
+            result.data = result.data.map((yarn) => {
+                const yarnObj = yarn.toObject();
+                yarnObj.projectCount = countMap.get(yarn._id.toString()) || 0;
+                return yarnObj;
+            });
+        }
+
+        return result;
     }
 
     async getById(id) {
@@ -24,7 +45,10 @@ class YarnService {
             throw new NotFoundError("Yarn");
         }
 
-        return yarn;
+        const yarnObj = yarn.toObject();
+        yarnObj.projectCount = yarnObj.usedInProjects ? yarnObj.usedInProjects.length : 0;
+
+        return yarnObj;
     }
 
     async create(data) {

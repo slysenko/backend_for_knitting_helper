@@ -18,6 +18,15 @@ const hookSchema = new Schema(
 
 hookSchema.index({ sizeMm: 1 });
 
+hookSchema.virtual("usedInProjects", {
+    ref: "Project",
+    localField: "_id",
+    foreignField: "hooksUsed.hook",
+});
+
+hookSchema.set("toJSON", { virtuals: true });
+hookSchema.set("toObject", { virtuals: true });
+
 const Hook = model("Hook", hookSchema);
 
 export default Hook;
